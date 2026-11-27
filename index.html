@@ -1,0 +1,833 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gestion des EPI</title>
+<script src="vendor/xlsx.full.min.js"></script>
+<script>if(typeof XLSX==='undefined') document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"><\/script>');</script>
+<style>
+:root{
+  --bg:#f4f6f9; --panel:#fff; --text:#1d2433; --muted:#6b7385; --line:#e3e7ee;
+  --primary:#0b6bcb; --primary-2:#e6f0fb; --ok:#1f8a4c; --ok-bg:#e5f5ec;
+  --warn:#b26a00; --warn-bg:#fff3dd; --bad:#c62f2f; --bad-bg:#fde8e8; --side:#13233a;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--text);font-size:14px}
+.app{display:flex;min-height:100vh}
+nav.side{width:220px;background:var(--side);color:#cfd8e6;padding:18px 12px;flex-shrink:0}
+nav.side h1{font-size:18px;color:#fff;margin:0 8px 20px;display:flex;gap:8px;align-items:center}
+nav.side button{display:flex;gap:10px;align-items:center;width:100%;background:none;border:0;color:inherit;padding:10px 12px;border-radius:8px;font-size:14px;cursor:pointer;text-align:left}
+nav.side button:hover{background:rgba(255,255,255,.07)}
+nav.side button.active{background:var(--primary);color:#fff}
+main{flex:1;padding:24px;min-width:0}
+h2{margin:0 0 16px;font-size:22px}
+h3{margin:0 0 12px;font-size:16px}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:16px}
+.toolbar .grow{flex:1}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:16px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
+.stat .v{font-size:28px;font-weight:700;margin-top:4px}
+.stat .l{color:var(--muted);font-size:13px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+button.btn,label.btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:#fff;color:var(--text);padding:8px 14px;border-radius:8px;cursor:pointer;font-size:14px;font-family:inherit}
+.btn:hover{border-color:#c5ccd8}
+.btn.primary{background:var(--primary);border-color:var(--primary);color:#fff}
+.btn.danger{color:var(--bad)}
+.btn.sm{padding:4px 9px;font-size:13px}
+input,select,textarea{font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--text);width:100%}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--primary-2);border-color:var(--primary)}
+.toolbar input,.toolbar select{width:auto;min-width:200px}
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+th,td{padding:9px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle;white-space:nowrap}
+th{font-size:12px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);background:#fafbfc;position:sticky;top:0}
+tr:hover td{background:#fafcff}
+td.actions{text-align:right}
+.badge{display:inline-block;padding:2px 8px;border-radius:99px;font-size:12px;font-weight:600}
+.b-ok{background:var(--ok-bg);color:var(--ok)}
+.b-warn{background:var(--warn-bg);color:var(--warn)}
+.b-bad{background:var(--bad-bg);color:var(--bad)}
+.b-info{background:var(--primary-2);color:var(--primary)}
+.muted{color:var(--muted)}
+.empty{padding:28px;text-align:center;color:var(--muted)}
+dialog{border:0;border-radius:14px;padding:0;width:min(860px,96vw);max-height:92vh;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+dialog::backdrop{background:rgba(15,25,40,.45)}
+dialog .dh{padding:16px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
+dialog .dh h3{margin:0}
+dialog .db{padding:20px;overflow:auto;max-height:70vh}
+dialog .df{padding:14px 20px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:8px}
+.form{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.form .full{grid-column:1/-1}
+.form label{display:flex;flex-direction:column;gap:5px;font-size:13px;color:var(--muted)}
+.x{background:none;border:0;font-size:22px;cursor:pointer;color:var(--muted)}
+.bar{height:10px;background:var(--primary-2);border-radius:99px;overflow:hidden}
+.bar > i{display:block;height:100%;background:var(--primary)}
+.barrow{display:grid;grid-template-columns:170px 1fr 40px;gap:10px;align-items:center;margin:7px 0}
+.cat-head{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.sizes{display:flex;flex-wrap:wrap;gap:6px}
+.size{border:1px solid var(--line);border-radius:8px;padding:4px 8px;font-size:12px}
+.size b{margin-left:4px}
+.size.low{border-color:#f0b4b4;background:var(--bad-bg)}
+.toast{position:fixed;bottom:20px;right:20px;background:#1d2433;color:#fff;padding:12px 16px;border-radius:10px;opacity:0;transform:translateY(10px);transition:.25s;z-index:99;max-width:360px}
+.toast.show{opacity:1;transform:none}
+.profile{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:16px}
+.profile div{background:#fafbfc;border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+.profile small{display:block;color:var(--muted);font-size:11px;text-transform:uppercase}
+.epi-status{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin-bottom:16px}
+.epi-status > div{border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+.hint{font-size:13px;color:var(--muted);line-height:1.5}
+code{background:#eef1f5;padding:1px 5px;border-radius:4px}
+@media (max-width:860px){
+  .app{flex-direction:column}
+  nav.side{width:100%;display:flex;overflow-x:auto;padding:8px;gap:4px;position:sticky;top:0;z-index:5}
+  nav.side h1{display:none}
+  nav.side button{white-space:nowrap;width:auto}
+  main{padding:16px}
+  .grid2,.form{grid-template-columns:1fr}
+  .toolbar input,.toolbar select{min-width:0;width:100%}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <nav class="side">
+    <h1>🦺 Gestion EPI</h1>
+    <button data-view="dashboard" class="active">📊 Tableau de bord</button>
+    <button data-view="personnel">👷 Personnel</button>
+    <button data-view="dotations">📦 Dotations</button>
+    <button data-view="catalogue">🧰 Catalogue & Stock</button>
+    <button data-view="data">💾 Import / Export</button>
+  </nav>
+  <main id="main"></main>
+</div>
+
+<dialog id="dlg"><div class="dh"><h3 id="dlgTitle"></h3><button class="x" onclick="closeDlg()">×</button></div><div class="db" id="dlgBody"></div><div class="df" id="dlgFoot"></div></dialog>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   Données & persistance (localStorage)
+   ============================================================ */
+const STORE_KEY = 'gestion-epi-v1';
+
+const DEFAULT_CATEGORIES = [
+  {nom:'Chaussures de sécurité', icone:'👞', typeTaille:'pointure', dureeMois:12, articles:[{designation:'Chaussure de sécurité S3', tailles:'38,39,40,41,42,43,44,45,46'}]},
+  {nom:'Lunettes de protection', icone:'🥽', typeTaille:'unique', dureeMois:6, articles:[{designation:'Lunettes de sécurité incolores', tailles:'Unique'}]},
+  {nom:'Gilet haute visibilité', icone:'🦺', typeTaille:'vetement', dureeMois:12, articles:[{designation:'Gilet HV jaune', tailles:'S,M,L,XL,XXL,XXXL'}]},
+  {nom:'Protection anti-bruit', icone:'🎧', typeTaille:'unique', dureeMois:12, articles:[{designation:'Casque anti-bruit', tailles:'Unique'},{designation:"Bouchons d'oreilles", tailles:'Unique'}]},
+  {nom:'Casque de sécurité', icone:'⛑️', typeTaille:'unique', dureeMois:24, articles:[{designation:'Casque de chantier', tailles:'Unique'}]},
+  {nom:'Gants de protection', icone:'🧤', typeTaille:'gants', dureeMois:1, articles:[{designation:'Gants de manutention', tailles:'7,8,9,10,11'}]},
+  {nom:'Masque respiratoire', icone:'😷', typeTaille:'unique', dureeMois:1, articles:[{designation:'Masque FFP2', tailles:'Unique'}]},
+  {nom:'Tenue de travail', icone:'👔', typeTaille:'vetement', dureeMois:12, articles:[{designation:'Combinaison de travail', tailles:'S,M,L,XL,XXL,XXXL'}]},
+  {nom:'Harnais antichute', icone:'🪢', typeTaille:'unique', dureeMois:36, articles:[{designation:'Harnais antichute', tailles:'Unique'}]},
+];
+
+const TYPE_TAILLE = {pointure:'Pointure', vetement:'Taille vêtement', gants:'Taille gants', unique:'Taille unique'};
+const MOTIFS = ['Première dotation','Renouvellement','Usure','Perte','Casse / détérioration','Changement de taille','Autre'];
+
+let db;
+
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+
+function seed(){
+  const d = {personnel:[], categories:[], articles:[], dotations:[], mouvements:[]};
+  DEFAULT_CATEGORIES.forEach(c=>{
+    const cid = uid();
+    d.categories.push({id:cid, nom:c.nom, icone:c.icone, typeTaille:c.typeTaille, dureeMois:c.dureeMois});
+    c.articles.forEach(a=>{
+      const stock = {}; a.tailles.split(',').forEach(t=>stock[t.trim()]=0);
+      d.articles.push({id:uid(), categorieId:cid, designation:a.designation, reference:'', seuil:5, stock});
+    });
+  });
+  return d;
+}
+
+function load(){
+  try { db = JSON.parse(localStorage.getItem(STORE_KEY)); } catch(e){ db = null; }
+  if(!db || !db.categories) db = seed();
+  db.mouvements = db.mouvements || [];
+}
+function save(){
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(db)); }
+  catch(e){ toast("⚠️ Impossible d'enregistrer dans le navigateur. Faites une sauvegarde (Import / Export)."); }
+}
+
+/* ============================================================
+   Utilitaires
+   ============================================================ */
+const $ = s => document.querySelector(s);
+function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function today(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function fmtDate(s){ if(!s) return '—'; const [y,m,d]=s.split('-'); return `${d}/${m}/${y}`; }
+function addMonths(s,n){ const d=new Date(s+'T00:00:00'); d.setMonth(d.getMonth()+Number(n)); return d.toISOString().slice(0,10); }
+function daysBetween(a,b){ return Math.round((new Date(b+'T00:00:00')-new Date(a+'T00:00:00'))/86400000); }
+function norm(s){ return String(s??'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim(); }
+function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),3200); }
+
+const person = id => db.personnel.find(p=>p.id===id);
+const cat = id => db.categories.find(c=>c.id===id);
+const article = id => db.articles.find(a=>a.id===id);
+const fullName = p => p ? `${(p.nom||'').toUpperCase()} ${p.prenom||''}`.trim() : '—';
+const stockTotal = a => Object.values(a.stock||{}).reduce((s,v)=>s+Number(v||0),0);
+
+function personSize(p, typeTaille){
+  if(!p) return '';
+  return {pointure:p.pointure, vetement:p.tailleVetement, gants:p.tailleGants, unique:'Unique'}[typeTaille] || '';
+}
+
+/* Statut de renouvellement pour une personne et une catégorie */
+function epiStatus(personneId, categorieId){
+  const c = cat(categorieId);
+  const last = db.dotations.filter(d=>d.personneId===personneId && d.categorieId===categorieId)
+                .sort((a,b)=>b.date.localeCompare(a.date))[0];
+  if(!last) return {state:'none', label:'Non doté'};
+  if(!c.dureeMois) return {state:'ok', last, label:'Doté'};
+  const due = addMonths(last.date, c.dureeMois);
+  const left = daysBetween(today(), due);
+  if(left < 0) return {state:'bad', last, due, left, label:`En retard (${-left} j)`};
+  if(left <= 30) return {state:'warn', last, due, left, label:`À renouveler (${left} j)`};
+  return {state:'ok', last, due, left, label:'À jour'};
+}
+const BADGE = {ok:'b-ok', warn:'b-warn', bad:'b-bad', none:'b-info'};
+
+/* ============================================================
+   Navigation
+   ============================================================ */
+let view = 'dashboard';
+const ui = {persSearch:'', persFonction:'', dotSearch:'', dotCat:'', dotFrom:'', dotTo:''};
+
+document.querySelectorAll('nav.side button').forEach(b=>b.onclick=()=>go(b.dataset.view));
+function go(v){
+  view = v;
+  document.querySelectorAll('nav.side button').forEach(b=>b.classList.toggle('active', b.dataset.view===v));
+  render();
+}
+function render(){
+  ({dashboard:renderDashboard, personnel:renderPersonnel, dotations:renderDotations, catalogue:renderCatalogue, data:renderData}[view])();
+}
+
+/* ============================================================
+   Tableau de bord
+   ============================================================ */
+function renderDashboard(){
+  const month = today().slice(0,7);
+  const actifs = db.personnel.filter(p=>p.actif!==false);
+  const dotMois = db.dotations.filter(d=>d.date.startsWith(month));
+  const lowStock = db.articles.filter(a=>Object.values(a.stock).some(v=>Number(v)<=Number(a.seuil||0)));
+
+  const renouv = [];
+  actifs.forEach(p=>{
+    db.categories.forEach(c=>{
+      const s = epiStatus(p.id, c.id);
+      if(s.state==='bad'||s.state==='warn') renouv.push({p,c,s});
+    });
+  });
+  renouv.sort((a,b)=>a.s.left-b.s.left);
+  const retard = renouv.filter(r=>r.s.state==='bad').length;
+
+  const byCat = db.categories.map(c=>({c, n:db.dotations.filter(d=>d.categorieId===c.id).reduce((s,d)=>s+Number(d.quantite||1),0)}));
+  const max = Math.max(1,...byCat.map(x=>x.n));
+
+  $('#main').innerHTML = `
+    <h2>Tableau de bord</h2>
+    <div class="stats">
+      <div class="stat"><div class="l">Personnel actif</div><div class="v">${actifs.length}</div></div>
+      <div class="stat"><div class="l">Dotations ce mois</div><div class="v">${dotMois.length}</div></div>
+      <div class="stat"><div class="l">Renouvellements en retard</div><div class="v" style="color:var(--bad)">${retard}</div></div>
+      <div class="stat"><div class="l">À renouveler (≤ 30 j)</div><div class="v" style="color:var(--warn)">${renouv.length-retard}</div></div>
+      <div class="stat"><div class="l">Articles en stock bas</div><div class="v">${lowStock.length}</div></div>
+    </div>
+    ${db.personnel.length===0 ? `<div class="card"><h3>👋 Bienvenue</h3><p class="hint">Commencez par importer votre liste du personnel (Excel ou CSV avec les colonnes <b>Matricule, Nom, Prénom, Fonction, EPI, Taille</b>…) depuis l'onglet <b>Import / Export</b>, ou ajoutez les personnes une par une dans <b>Personnel</b>.</p><button class="btn primary" onclick="go('data')">Importer la liste du personnel</button></div>`:''}
+    <div class="grid2">
+      <div class="card">
+        <h3>⏰ Renouvellements à prévoir</h3>
+        ${renouv.length? `<div class="table-wrap" style="max-height:420px"><table><thead><tr><th>Matricule</th><th>Nom</th><th>EPI</th><th>Échéance</th><th>Statut</th><th></th></tr></thead><tbody>
+        ${renouv.slice(0,100).map(r=>`<tr><td>${esc(r.p.matricule)}</td><td>${esc(fullName(r.p))}</td><td>${r.c.icone} ${esc(r.c.nom)}</td><td>${fmtDate(r.s.due)}</td><td><span class="badge ${BADGE[r.s.state]}">${r.s.label}</span></td><td><button class="btn sm" onclick="openDotation({personneId:'${r.p.id}',categorieId:'${r.c.id}',motif:'Renouvellement'})">Doter</button></td></tr>`).join('')}
+        </tbody></table></div>` : '<div class="empty">Aucun renouvellement à prévoir 👍</div>'}
+      </div>
+      <div class="card">
+        <h3>📈 Dotations par catégorie</h3>
+        ${byCat.map(x=>`<div class="barrow"><span>${x.c.icone} ${esc(x.c.nom)}</span><div class="bar"><i style="width:${x.n/max*100}%"></i></div><b>${x.n}</b></div>`).join('')}
+        <h3 style="margin-top:20px">📉 Stock bas</h3>
+        ${lowStock.length? lowStock.map(a=>`<div style="margin:6px 0">${cat(a.categorieId)?.icone||''} <b>${esc(a.designation)}</b> : ${Object.entries(a.stock).filter(([,v])=>Number(v)<=Number(a.seuil||0)).map(([t,v])=>`<span class="badge b-bad">${esc(t)} : ${v}</span>`).join(' ')}</div>`).join('') : '<div class="muted">Stock suffisant.</div>'}
+      </div>
+    </div>`;
+}
+
+/* ============================================================
+   Personnel
+   ============================================================ */
+function renderPersonnel(){
+  const fonctions = [...new Set(db.personnel.map(p=>p.fonction).filter(Boolean))].sort();
+  const q = norm(ui.persSearch);
+  const list = db.personnel.filter(p=>{
+    if(ui.persFonction && p.fonction!==ui.persFonction) return false;
+    if(!q) return true;
+    return norm([p.matricule,p.nom,p.prenom,p.fonction,p.service].join(' ')).includes(q);
+  }).sort((a,b)=>String(a.matricule).localeCompare(String(b.matricule),'fr',{numeric:true}));
+
+  $('#main').innerHTML = `
+    <h2>Personnel <span class="muted" style="font-size:15px">(${db.personnel.length})</span></h2>
+    <div class="toolbar">
+      <input id="ps" placeholder="🔎 Rechercher matricule, nom, fonction…" value="${esc(ui.persSearch)}">
+      <select id="pf"><option value="">Toutes les fonctions</option>${fonctions.map(f=>`<option ${f===ui.persFonction?'selected':''}>${esc(f)}</option>`).join('')}</select>
+      <span class="grow"></span>
+      <button class="btn primary" onclick="openPerson()">＋ Ajouter une personne</button>
+    </div>
+    <div class="card" style="padding:0">
+      ${list.length? `<div class="table-wrap"><table><thead><tr><th>Matricule</th><th>Nom</th><th>Prénom</th><th>Fonction</th><th>Service</th><th>Vêt.</th><th>Pointure</th><th>Gants</th><th>Statut EPI</th><th></th></tr></thead><tbody>
+      ${list.map(p=>{
+        const st = db.categories.map(c=>epiStatus(p.id,c.id).state);
+        const bad = st.filter(s=>s==='bad').length, warn = st.filter(s=>s==='warn').length, nb = db.dotations.filter(d=>d.personneId===p.id).length;
+        const badge = bad? `<span class="badge b-bad">${bad} en retard</span>` : warn? `<span class="badge b-warn">${warn} à renouveler</span>` : nb? '<span class="badge b-ok">À jour</span>' : '<span class="badge b-info">Aucune dotation</span>';
+        return `<tr style="${p.actif===false?'opacity:.5':''}"><td><b>${esc(p.matricule)}</b></td><td>${esc((p.nom||'').toUpperCase())}</td><td>${esc(p.prenom)}</td><td>${esc(p.fonction)}</td><td>${esc(p.service)}</td><td>${esc(p.tailleVetement)}</td><td>${esc(p.pointure)}</td><td>${esc(p.tailleGants)}</td><td>${badge}</td>
+        <td class="actions"><button class="btn sm" onclick="openFiche('${p.id}')">Fiche</button> <button class="btn sm primary" onclick="openDotation({personneId:'${p.id}'})">Doter</button> <button class="btn sm" onclick="openPerson('${p.id}')">✎</button></td></tr>`;
+      }).join('')}
+      </tbody></table></div>` : `<div class="empty">${db.personnel.length? 'Aucun résultat.' : 'Aucune personne. Importez votre liste depuis <b>Import / Export</b> ou ajoutez-en une.'}</div>`}
+    </div>`;
+  const ps = $('#ps'); ps.oninput = e=>{ ui.persSearch=e.target.value; renderPersonnel(); const n=$('#ps'); n.focus(); n.setSelectionRange(n.value.length,n.value.length); };
+  $('#pf').onchange = e=>{ ui.persFonction=e.target.value; renderPersonnel(); };
+}
+
+function openPerson(id){
+  const p = id? person(id) : {actif:true};
+  openDlg(id? 'Modifier la personne' : 'Ajouter une personne', `
+    <div class="form">
+      <label>Matricule *<input id="f_mat" value="${esc(p.matricule)}"></label>
+      <label>Fonction<input id="f_fon" value="${esc(p.fonction)}" list="dl_fon"></label>
+      <label>Nom *<input id="f_nom" value="${esc(p.nom)}"></label>
+      <label>Prénom<input id="f_pre" value="${esc(p.prenom)}"></label>
+      <label>Service / Chantier<input id="f_ser" value="${esc(p.service)}" list="dl_ser"></label>
+      <label>Téléphone<input id="f_tel" value="${esc(p.telephone)}"></label>
+      <label>Taille vêtement<input id="f_tv" value="${esc(p.tailleVetement)}" placeholder="S, M, L, XL…"></label>
+      <label>Pointure<input id="f_pt" value="${esc(p.pointure)}" placeholder="38…46"></label>
+      <label>Taille gants<input id="f_tg" value="${esc(p.tailleGants)}" placeholder="7…11"></label>
+      <label>Statut<select id="f_act"><option value="1">Actif</option><option value="0" ${p.actif===false?'selected':''}>Inactif / parti</option></select></label>
+      <label class="full">Observations<textarea id="f_obs" rows="2">${esc(p.observations)}</textarea></label>
+    </div>
+    <datalist id="dl_fon">${[...new Set(db.personnel.map(x=>x.fonction).filter(Boolean))].map(f=>`<option value="${esc(f)}">`).join('')}</datalist>
+    <datalist id="dl_ser">${[...new Set(db.personnel.map(x=>x.service).filter(Boolean))].map(f=>`<option value="${esc(f)}">`).join('')}</datalist>`,
+  [
+    id? {label:'Supprimer', cls:'danger', fn:()=>{ if(!confirm('Supprimer cette personne et son historique de dotations ?')) return; db.personnel=db.personnel.filter(x=>x.id!==id); db.dotations=db.dotations.filter(d=>d.personneId!==id); save(); closeDlg(); render(); toast('Personne supprimée'); }} : null,
+    {label:'Annuler', fn:closeDlg},
+    {label:'Enregistrer', cls:'primary', fn:()=>{
+      const mat = $('#f_mat').value.trim(), nom = $('#f_nom').value.trim();
+      if(!mat||!nom) return toast('Matricule et nom obligatoires');
+      if(db.personnel.some(x=>x.id!==id && String(x.matricule).trim().toLowerCase()===mat.toLowerCase())) return toast('Ce matricule existe déjà');
+      Object.assign(p, {matricule:mat, nom, prenom:$('#f_pre').value.trim(), fonction:$('#f_fon').value.trim(), service:$('#f_ser').value.trim(), telephone:$('#f_tel').value.trim(),
+        tailleVetement:$('#f_tv').value.trim().toUpperCase(), pointure:$('#f_pt').value.trim(), tailleGants:$('#f_tg').value.trim(), actif:$('#f_act').value==='1', observations:$('#f_obs').value.trim()});
+      if(!id){ p.id=uid(); db.personnel.push(p); }
+      save(); closeDlg(); render(); toast('Enregistré ✔');
+    }}
+  ]);
+}
+
+function openFiche(id){
+  const p = person(id);
+  const dots = db.dotations.filter(d=>d.personneId===id).sort((a,b)=>b.date.localeCompare(a.date));
+  openDlg(`Fiche EPI — ${esc(fullName(p))}`, `
+    <div class="profile">
+      <div><small>Matricule</small>${esc(p.matricule)}</div>
+      <div><small>Fonction</small>${esc(p.fonction)||'—'}</div>
+      <div><small>Service</small>${esc(p.service)||'—'}</div>
+      <div><small>Vêtement / Pointure / Gants</small>${esc(p.tailleVetement)||'—'} / ${esc(p.pointure)||'—'} / ${esc(p.tailleGants)||'—'}</div>
+    </div>
+    <h3>Situation par EPI</h3>
+    <div class="epi-status">${db.categories.map(c=>{ const s=epiStatus(id,c.id); return `<div>${c.icone} <b>${esc(c.nom)}</b><br><span class="badge ${BADGE[s.state]}">${s.label}</span>${s.last?`<div class="muted" style="font-size:12px;margin-top:4px">Dernière : ${fmtDate(s.last.date)}${s.due?` · Échéance : ${fmtDate(s.due)}`:''}</div>`:''}</div>`; }).join('')}</div>
+    <h3>Historique des dotations (${dots.length})</h3>
+    ${dots.length? `<div class="table-wrap"><table><thead><tr><th>Date</th><th>EPI</th><th>Taille</th><th>Qté</th><th>Motif</th></tr></thead><tbody>${dots.map(d=>`<tr><td>${fmtDate(d.date)}</td><td>${esc(article(d.articleId)?.designation || cat(d.categorieId)?.nom)}</td><td>${esc(d.taille)}</td><td>${d.quantite}</td><td>${esc(d.motif)}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">Aucune dotation.</div>'}`,
+  [
+    {label:'🖨️ Imprimer la fiche', fn:()=>printFiche(id)},
+    {label:'Modifier', fn:()=>{ closeDlg(); openPerson(id); }},
+    {label:'＋ Nouvelle dotation', cls:'primary', fn:()=>{ closeDlg(); openDotation({personneId:id}); }},
+  ]);
+}
+
+function printFiche(id){
+  const p = person(id);
+  const dots = db.dotations.filter(d=>d.personneId===id).sort((a,b)=>a.date.localeCompare(b.date));
+  const w = window.open('', '_blank');
+  if(!w) return toast('Autorisez les fenêtres pop-up pour imprimer');
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Fiche EPI ${esc(p.matricule)}</title>
+  <style>body{font-family:Arial,sans-serif;font-size:12px;margin:24px;color:#000}h1{font-size:18px;text-align:center;margin:0 0 4px}p.c{text-align:center;margin:0 0 18px}
+  table{width:100%;border-collapse:collapse;margin-top:10px}th,td{border:1px solid #000;padding:6px;text-align:left}th{background:#eee}
+  .info td{border:none;padding:3px 6px}.sig{display:flex;justify-content:space-between;margin-top:40px}.sig div{width:45%;border-top:1px solid #000;padding-top:6px;text-align:center}
+  .note{margin-top:16px;font-size:11px}</style></head><body>
+  <h1>FICHE INDIVIDUELLE DE DOTATION EN EPI</h1><p class="c">Équipements de Protection Individuelle</p>
+  <table class="info"><tr><td><b>Matricule :</b> ${esc(p.matricule)}</td><td><b>Nom & Prénom :</b> ${esc(fullName(p))}</td></tr>
+  <tr><td><b>Fonction :</b> ${esc(p.fonction)}</td><td><b>Service :</b> ${esc(p.service)}</td></tr>
+  <tr><td><b>Taille vêtement :</b> ${esc(p.tailleVetement)}</td><td><b>Pointure :</b> ${esc(p.pointure)} &nbsp; <b>Gants :</b> ${esc(p.tailleGants)}</td></tr></table>
+  <table><thead><tr><th>Date</th><th>Désignation EPI</th><th>Taille</th><th>Qté</th><th>Motif</th><th style="width:110px">Émargement</th></tr></thead><tbody>
+  ${dots.map(d=>`<tr><td>${fmtDate(d.date)}</td><td>${esc(article(d.articleId)?.designation || cat(d.categorieId)?.nom)}</td><td>${esc(d.taille)}</td><td>${d.quantite}</td><td>${esc(d.motif)}</td><td></td></tr>`).join('')}
+  ${Array.from({length:Math.max(0,8-dots.length)}).map(()=>'<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td></tr>').join('')}
+  </tbody></table>
+  <p class="note">Je soussigné(e) reconnais avoir reçu les équipements de protection individuelle ci-dessus, m'engage à les porter pendant toute la durée du travail, à en prendre soin et à signaler toute détérioration ou perte.</p>
+  <div class="sig"><div>Signature du salarié</div><div>Signature du responsable HSE</div></div>
+  <script>window.onload=()=>window.print()<\/script></body></html>`);
+  w.document.close();
+}
+
+/* ============================================================
+   Dotations
+   ============================================================ */
+function renderDotations(){
+  const q = norm(ui.dotSearch);
+  const list = db.dotations.filter(d=>{
+    if(ui.dotCat && d.categorieId!==ui.dotCat) return false;
+    if(ui.dotFrom && d.date < ui.dotFrom) return false;
+    if(ui.dotTo && d.date > ui.dotTo) return false;
+    if(!q) return true;
+    const p = person(d.personneId);
+    return norm([p?.matricule,p?.nom,p?.prenom,p?.fonction,article(d.articleId)?.designation,d.motif].join(' ')).includes(q);
+  }).sort((a,b)=>b.date.localeCompare(a.date) || (b.createdAt||'').localeCompare(a.createdAt||''));
+
+  $('#main').innerHTML = `
+    <h2>Dotations <span class="muted" style="font-size:15px">(${db.dotations.length})</span></h2>
+    <div class="toolbar">
+      <input id="ds" placeholder="🔎 Matricule, nom, EPI…" value="${esc(ui.dotSearch)}">
+      <select id="dc"><option value="">Toutes les catégories</option>${db.categories.map(c=>`<option value="${c.id}" ${c.id===ui.dotCat?'selected':''}>${c.icone} ${esc(c.nom)}</option>`).join('')}</select>
+      <input type="date" id="dfrom" value="${ui.dotFrom}" title="Du" style="min-width:0">
+      <input type="date" id="dto" value="${ui.dotTo}" title="Au" style="min-width:0">
+      <span class="grow"></span>
+      <button class="btn" onclick="exportDotations()">⬇️ Exporter</button>
+      <button class="btn primary" onclick="openDotation()">＋ Nouvelle dotation</button>
+    </div>
+    <div class="card" style="padding:0">
+      ${list.length? `<div class="table-wrap"><table><thead><tr><th>Date</th><th>Matricule</th><th>Nom & Prénom</th><th>Fonction</th><th>EPI</th><th>Taille</th><th>Qté</th><th>Motif</th><th></th></tr></thead><tbody>
+      ${list.map(d=>{ const p=person(d.personneId), c=cat(d.categorieId); return `<tr><td>${fmtDate(d.date)}</td><td>${esc(p?.matricule)}</td><td>${esc(fullName(p))}</td><td>${esc(p?.fonction)}</td><td>${c?.icone||''} ${esc(article(d.articleId)?.designation || c?.nom)}</td><td>${esc(d.taille)}</td><td>${d.quantite}</td><td>${esc(d.motif)}</td><td class="actions"><button class="btn sm danger" onclick="deleteDotation('${d.id}')">Annuler</button></td></tr>`; }).join('')}
+      </tbody></table></div>` : '<div class="empty">Aucune dotation.</div>'}
+    </div>`;
+  $('#ds').oninput = e=>{ ui.dotSearch=e.target.value; renderDotations(); const n=$('#ds'); n.focus(); n.setSelectionRange(n.value.length,n.value.length); };
+  $('#dc').onchange = e=>{ ui.dotCat=e.target.value; renderDotations(); };
+  $('#dfrom').onchange = e=>{ ui.dotFrom=e.target.value; renderDotations(); };
+  $('#dto').onchange = e=>{ ui.dotTo=e.target.value; renderDotations(); };
+}
+
+function deleteDotation(id){
+  const d = db.dotations.find(x=>x.id===id);
+  if(!confirm('Annuler cette dotation ? La quantité sera remise en stock.')) return;
+  const a = article(d.articleId);
+  if(a && d.taille in a.stock) a.stock[d.taille] = Number(a.stock[d.taille]) + Number(d.quantite);
+  db.dotations = db.dotations.filter(x=>x.id!==id);
+  save(); render(); toast('Dotation annulée, stock remis à jour');
+}
+
+function personLabel(p){ return `${p.matricule} — ${fullName(p)}${p.fonction?' ('+p.fonction+')':''}`; }
+
+function openDotation(pre={}){
+  if(!db.personnel.length) return toast("Ajoutez ou importez d'abord le personnel");
+  const p0 = pre.personneId? person(pre.personneId) : null;
+  openDlg('Nouvelle dotation EPI', `
+    <div class="form">
+      <label class="full">Personne * <input id="d_per" list="dl_per" placeholder="Tapez le matricule ou le nom…" value="${p0? esc(personLabel(p0)) : ''}"></label>
+      <div class="full hint" id="d_info"></div>
+      <label class="full">EPI à remettre (cochez un ou plusieurs)</label>
+      <div class="full" id="d_lines"></div>
+      <label>Date de remise<input type="date" id="d_date" value="${today()}"></label>
+      <label>Motif<select id="d_mot">${MOTIFS.map(m=>`<option ${m===(pre.motif||'')?'selected':''}>${m}</option>`).join('')}</select></label>
+      <label class="full">Observation<input id="d_obs"></label>
+    </div>
+    <datalist id="dl_per">${db.personnel.filter(p=>p.actif!==false).map(p=>`<option value="${esc(personLabel(p))}">`).join('')}</datalist>`,
+  [
+    {label:'Annuler', fn:closeDlg},
+    {label:'Enregistrer la dotation', cls:'primary', fn:saveDotation}
+  ]);
+
+  const findPerson = () => { const v=$('#d_per').value.trim(); return db.personnel.find(p=>personLabel(p)===v) || db.personnel.find(p=>String(p.matricule).toLowerCase()===v.toLowerCase()); };
+  const drawLines = () => {
+    const p = findPerson();
+    $('#d_info').innerHTML = p? `👤 <b>${esc(fullName(p))}</b> · ${esc(p.fonction)||'—'} · Vêt. ${esc(p.tailleVetement)||'?'} · Pointure ${esc(p.pointure)||'?'} · Gants ${esc(p.tailleGants)||'?'}` : '';
+    $('#d_lines').innerHTML = `<div class="table-wrap"><table><thead><tr><th></th><th>EPI</th><th>Article</th><th>Taille</th><th>Qté</th><th>Statut</th></tr></thead><tbody>${
+      db.categories.map(c=>{
+        const arts = db.articles.filter(a=>a.categorieId===c.id);
+        if(!arts.length) return '';
+        const s = p? epiStatus(p.id,c.id) : null;
+        const checked = pre.categorieId? pre.categorieId===c.id : false;
+        return `<tr data-cat="${c.id}"><td><input type="checkbox" class="d_chk" style="width:auto" ${checked?'checked':''}></td><td>${c.icone} ${esc(c.nom)}</td>
+          <td><select class="d_art">${arts.map(a=>`<option value="${a.id}">${esc(a.designation)}</option>`).join('')}</select></td>
+          <td><select class="d_tai"></select></td><td><input type="number" class="d_qte" min="1" value="1" style="width:64px"></td>
+          <td>${s?`<span class="badge ${BADGE[s.state]}">${s.label}</span>`:''}</td></tr>`;
+      }).join('')}</tbody></table></div>`;
+    document.querySelectorAll('#d_lines tr[data-cat]').forEach(tr=>{
+      const fillSizes = () => {
+        const a = article(tr.querySelector('.d_art').value), c = cat(tr.dataset.cat);
+        const want = String(personSize(p, c.typeTaille)||'').toUpperCase();
+        tr.querySelector('.d_tai').innerHTML = Object.entries(a.stock).map(([t,v])=>`<option value="${esc(t)}" ${t.toUpperCase()===want?'selected':''}>${esc(t)} (stock ${v})</option>`).join('');
+      };
+      tr.querySelector('.d_art').onchange = fillSizes; fillSizes();
+      tr.querySelectorAll('select,input[type=number]').forEach(el=>el.addEventListener('change',()=>tr.querySelector('.d_chk').checked=true));
+    });
+  };
+  $('#d_per').addEventListener('input', drawLines);
+  drawLines();
+}
+
+function saveDotation(){
+  const v = $('#d_per').value.trim();
+  const p = db.personnel.find(x=>personLabel(x)===v) || db.personnel.find(x=>String(x.matricule).toLowerCase()===v.toLowerCase());
+  if(!p) return toast('Sélectionnez une personne dans la liste');
+  const rows = [...document.querySelectorAll('#d_lines tr[data-cat]')].filter(tr=>tr.querySelector('.d_chk').checked);
+  if(!rows.length) return toast('Cochez au moins un EPI');
+  const lines = rows.map(tr=>({categorieId:tr.dataset.cat, articleId:tr.querySelector('.d_art').value, taille:tr.querySelector('.d_tai').value, quantite:Math.max(1,Number(tr.querySelector('.d_qte').value)||1)}));
+  const short = lines.filter(l=>Number(article(l.articleId).stock[l.taille]||0) < l.quantite);
+  if(short.length && !confirm(`Stock insuffisant pour : ${short.map(l=>article(l.articleId).designation+' ('+l.taille+')').join(', ')}.\nEnregistrer quand même ? (le stock deviendra négatif)`)) return;
+  const date = $('#d_date').value || today(), motif = $('#d_mot').value, obs = $('#d_obs').value.trim();
+  lines.forEach(l=>{
+    const a = article(l.articleId);
+    a.stock[l.taille] = Number(a.stock[l.taille]||0) - l.quantite;
+    db.dotations.push({id:uid(), personneId:p.id, ...l, date, motif, observation:obs, createdAt:new Date().toISOString()});
+  });
+  save(); closeDlg(); render(); toast(`${lines.length} EPI remis à ${fullName(p)} ✔`);
+}
+
+/* ============================================================
+   Catalogue & stock
+   ============================================================ */
+function renderCatalogue(){
+  $('#main').innerHTML = `
+    <h2>Catalogue & Stock</h2>
+    <div class="toolbar"><span class="hint">Gérez les catégories d'EPI, leur durée de renouvellement, les articles, les tailles et le stock.</span><span class="grow"></span>
+      <button class="btn" onclick="openCategorie()">＋ Catégorie</button><button class="btn primary" onclick="openArticle()">＋ Article</button></div>
+    ${db.categories.map(c=>{
+      const arts = db.articles.filter(a=>a.categorieId===c.id);
+      return `<div class="card"><div class="cat-head"><h3 style="margin:0">${c.icone} ${esc(c.nom)} <span class="muted" style="font-weight:400;font-size:13px">· ${TYPE_TAILLE[c.typeTaille]} · renouvellement ${c.dureeMois? 'tous les '+c.dureeMois+' mois' : 'non défini'}</span></h3>
+        <div><button class="btn sm" onclick="openCategorie('${c.id}')">✎ Catégorie</button> <button class="btn sm" onclick="openArticle(null,'${c.id}')">＋ Article</button></div></div>
+        ${arts.length? arts.map(a=>`<div style="border-top:1px solid var(--line);margin-top:12px;padding-top:12px">
+          <div class="cat-head"><div><b>${esc(a.designation)}</b> ${a.reference?`<span class="muted">· Réf. ${esc(a.reference)}</span>`:''} <span class="muted">· Total : <b>${stockTotal(a)}</b> · Seuil alerte : ${a.seuil}</span></div>
+          <div><button class="btn sm primary" onclick="openEntree('${a.id}')">📥 Entrée stock</button> <button class="btn sm" onclick="openArticle('${a.id}')">✎</button></div></div>
+          <div class="sizes" style="margin-top:8px">${Object.entries(a.stock).map(([t,v])=>`<span class="size ${Number(v)<=Number(a.seuil||0)?'low':''}">${esc(t)}<b>${v}</b></span>`).join('')}</div></div>`).join('') : '<div class="muted" style="margin-top:8px">Aucun article.</div>'}
+      </div>`;
+    }).join('')}`;
+}
+
+function openCategorie(id){
+  const c = id? cat(id) : {icone:'🛡️', typeTaille:'unique', dureeMois:12};
+  openDlg(id?'Modifier la catégorie':'Nouvelle catégorie', `
+    <div class="form">
+      <label>Nom *<input id="c_nom" value="${esc(c.nom)}"></label>
+      <label>Icône (emoji)<input id="c_ic" value="${esc(c.icone)}"></label>
+      <label>Type de taille<select id="c_tt">${Object.entries(TYPE_TAILLE).map(([k,v])=>`<option value="${k}" ${k===c.typeTaille?'selected':''}>${v}</option>`).join('')}</select></label>
+      <label>Renouvellement (mois, 0 = aucun)<input type="number" min="0" id="c_du" value="${c.dureeMois}"></label>
+    </div>`,
+  [
+    id? {label:'Supprimer', cls:'danger', fn:()=>{ if(db.dotations.some(d=>d.categorieId===id)) return toast('Impossible : des dotations utilisent cette catégorie'); if(!confirm('Supprimer cette catégorie et ses articles ?')) return; db.categories=db.categories.filter(x=>x.id!==id); db.articles=db.articles.filter(a=>a.categorieId!==id); save(); closeDlg(); render(); }} : null,
+    {label:'Annuler', fn:closeDlg},
+    {label:'Enregistrer', cls:'primary', fn:()=>{
+      const nom=$('#c_nom').value.trim(); if(!nom) return toast('Nom obligatoire');
+      Object.assign(c,{nom, icone:$('#c_ic').value.trim()||'🛡️', typeTaille:$('#c_tt').value, dureeMois:Number($('#c_du').value)||0});
+      if(!id){ c.id=uid(); db.categories.push(c); }
+      save(); closeDlg(); render(); toast('Catégorie enregistrée');
+    }}
+  ]);
+}
+
+function openArticle(id, catId){
+  const a = id? article(id) : {categorieId:catId||db.categories[0]?.id, seuil:5, stock:{}};
+  const defaultSizes = {pointure:'38,39,40,41,42,43,44,45,46', vetement:'S,M,L,XL,XXL,XXXL', gants:'7,8,9,10,11', unique:'Unique'};
+  openDlg(id?"Modifier l'article":'Nouvel article', `
+    <div class="form">
+      <label class="full">Catégorie<select id="a_cat">${db.categories.map(c=>`<option value="${c.id}" ${c.id===a.categorieId?'selected':''}>${c.icone} ${esc(c.nom)}</option>`).join('')}</select></label>
+      <label>Désignation *<input id="a_des" value="${esc(a.designation)}"></label>
+      <label>Référence<input id="a_ref" value="${esc(a.reference)}"></label>
+      <label class="full">Tailles (séparées par des virgules)<input id="a_tai" value="${esc(Object.keys(a.stock).join(',') || defaultSizes[cat(a.categorieId)?.typeTaille]||'Unique')}"></label>
+      <label>Seuil d'alerte stock<input type="number" min="0" id="a_seu" value="${a.seuil}"></label>
+    </div>`,
+  [
+    id? {label:'Supprimer', cls:'danger', fn:()=>{ if(db.dotations.some(d=>d.articleId===id)) return toast('Impossible : des dotations utilisent cet article'); if(!confirm('Supprimer cet article ?')) return; db.articles=db.articles.filter(x=>x.id!==id); save(); closeDlg(); render(); }} : null,
+    {label:'Annuler', fn:closeDlg},
+    {label:'Enregistrer', cls:'primary', fn:()=>{
+      const des=$('#a_des').value.trim(); if(!des) return toast('Désignation obligatoire');
+      const sizes=$('#a_tai').value.split(',').map(s=>s.trim()).filter(Boolean);
+      if(!sizes.length) return toast('Indiquez au moins une taille');
+      const stock={}; sizes.forEach(s=>stock[s]=Number(a.stock[s]||0));
+      Object.assign(a,{categorieId:$('#a_cat').value, designation:des, reference:$('#a_ref').value.trim(), seuil:Number($('#a_seu').value)||0, stock});
+      if(!id){ a.id=uid(); db.articles.push(a); }
+      save(); closeDlg(); render(); toast('Article enregistré');
+    }}
+  ]);
+}
+
+function openEntree(id){
+  const a = article(id);
+  openDlg(`Entrée en stock — ${esc(a.designation)}`, `
+    <p class="hint">Saisissez les quantités reçues (ajoutées au stock actuel). Pour un inventaire, cochez « Remplacer ».</p>
+    <div class="form">${Object.entries(a.stock).map(([t,v])=>`<label>Taille ${esc(t)} <span>(actuel : ${v})</span><input type="number" class="e_q" data-t="${esc(t)}" value="0"></label>`).join('')}
+    <label class="full" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" id="e_rep" style="width:auto"> Remplacer le stock (inventaire)</label></div>`,
+  [
+    {label:'Annuler', fn:closeDlg},
+    {label:'Valider', cls:'primary', fn:()=>{
+      const rep = $('#e_rep').checked;
+      document.querySelectorAll('.e_q').forEach(i=>{ const q=Number(i.value)||0, t=i.dataset.t; if(rep) a.stock[t]=q; else a.stock[t]=Number(a.stock[t]||0)+q; if(q||rep) db.mouvements.push({id:uid(), articleId:a.id, taille:t, quantite:q, type:rep?'inventaire':'entrée', date:today()}); });
+      save(); closeDlg(); render(); toast('Stock mis à jour');
+    }}
+  ]);
+}
+
+/* ============================================================
+   Import / Export
+   ============================================================ */
+function renderData(){
+  $('#main').innerHTML = `
+    <h2>Import / Export</h2>
+    <div class="grid2">
+      <div class="card">
+        <h3>📥 Importer la liste du personnel</h3>
+        <p class="hint">Fichier <b>Excel (.xlsx, .xls)</b> ou <b>CSV</b>. La première ligne doit contenir les titres de colonnes. Colonnes reconnues automatiquement :<br>
+        <code>Matricule</code> <code>Nom</code> <code>Prénom</code> <code>Fonction</code> <code>Service</code> <code>Taille</code> <code>Pointure</code> <code>Gants</code> <code>EPI</code> <code>Date</code><br>
+        Si une colonne <b>EPI</b> existe (ex. « Chaussure », « Gilet », « Lunettes », « Anti-bruit »…), les EPI peuvent être enregistrés comme dotations, avec la <b>taille</b> de la même ligne. Une personne peut apparaître sur plusieurs lignes (une ligne par EPI).<br>
+        Si le nom et le prénom sont dans une seule colonne « Nom et prénom », ils seront séparés automatiquement.</p>
+        <label class="btn primary">📂 Choisir le fichier<input type="file" id="impFile" accept=".xlsx,.xls,.csv,.txt" hidden></label>
+        <button class="btn" onclick="downloadTemplate()">⬇️ Modèle Excel</button>
+      </div>
+      <div class="card">
+        <h3>📤 Exporter</h3>
+        <p class="hint">Exporte le personnel, les dotations, le stock et la situation des renouvellements dans un classeur Excel.</p>
+        <button class="btn primary" onclick="exportAll()">⬇️ Exporter tout en Excel</button>
+        <h3 style="margin-top:22px">🛟 Sauvegarde</h3>
+        <p class="hint">Les données sont enregistrées dans ce navigateur. Faites régulièrement une sauvegarde pour ne rien perdre ou pour transférer les données vers un autre ordinateur.</p>
+        <button class="btn" onclick="backup()">💾 Télécharger une sauvegarde</button>
+        <label class="btn">♻️ Restaurer<input type="file" id="restFile" accept=".json" hidden></label>
+        <button class="btn danger" onclick="resetAll()">🗑️ Tout effacer</button>
+      </div>
+    </div>`;
+  $('#impFile').onchange = e=>{ const f=e.target.files[0]; if(f) importFile(f); e.target.value=''; };
+  $('#restFile').onchange = e=>{ const f=e.target.files[0]; if(f) restore(f); e.target.value=''; };
+}
+
+/* --- Lecture des fichiers --- */
+function parseCSV(text){
+  const first = text.split(/\r?\n/)[0] || '';
+  const sep = (first.match(/;/g)||[]).length > (first.match(/,/g)||[]).length ? ';' : (first.includes('\t') ? '\t' : ',');
+  const rows=[]; let row=[], cell='', q=false;
+  for(let i=0;i<text.length;i++){
+    const ch=text[i];
+    if(q){ if(ch==='"'){ if(text[i+1]==='"'){cell+='"';i++;} else q=false; } else cell+=ch; }
+    else if(ch==='"') q=true;
+    else if(ch===sep){ row.push(cell); cell=''; }
+    else if(ch==='\n'){ row.push(cell); rows.push(row); row=[]; cell=''; }
+    else if(ch!=='\r') cell+=ch;
+  }
+  if(cell||row.length){ row.push(cell); rows.push(row); }
+  return rows;
+}
+
+function readRows(file){
+  return new Promise((resolve,reject)=>{
+    const r = new FileReader();
+    const isCsv = /\.(csv|txt)$/i.test(file.name);
+    r.onerror = ()=>reject(r.error);
+    if(isCsv){ r.onload = ()=>resolve(parseCSV(String(r.result).replace(/^﻿/,''))); r.readAsText(file,'utf-8'); }
+    else {
+      if(typeof XLSX==='undefined') return reject(new Error("La lecture Excel nécessite une connexion internet. Enregistrez votre fichier en CSV puis réessayez."));
+      r.onload = ()=>{ const wb = XLSX.read(new Uint8Array(r.result), {type:'array', cellDates:true}); const ws = wb.Sheets[wb.SheetNames[0]]; resolve(XLSX.utils.sheet_to_json(ws,{header:1, raw:false, dateNF:'yyyy-mm-dd', defval:''})); };
+      r.readAsArrayBuffer(file);
+    }
+  });
+}
+
+/* --- Reconnaissance des colonnes --- */
+const COLS = {
+  matricule:['matricule','mat','n matricule','num matricule','numero matricule','code','id','n','no','badge'],
+  nomComplet:['nom et prenom','nom prenom','nom complet','nom & prenom','salarie','employe','nom et prenoms','personne'],
+  nom:['nom','nom de famille'],
+  prenom:['prenom','prenoms'],
+  fonction:['fonction','poste','emploi','qualification','metier','profession'],
+  service:['service','departement','affectation','chantier','site','direction','equipe','section'],
+  tailleVetement:['taille vetement','taille gilet','taille tenue','taille combinaison','vetement','taille habit','t vetement'],
+  pointure:['pointure','taille chaussure','taille chaussures','chaussure','chaussures','t chaussure'],
+  tailleGants:['taille gants','taille gant','gants','gant'],
+  taille:['taille','size','tailles'],
+  epi:['epi','equipement','designation','article','type epi','epi remis','epi fourni','materiel'],
+  quantite:['quantite','qte','qty','nombre'],
+  date:['date','date remise','date de remise','date dotation','date de dotation','date livraison'],
+  telephone:['telephone','tel','gsm','portable'],
+};
+function detectCols(header){
+  const h = header.map(norm), map = {};
+  for(const [k,alts] of Object.entries(COLS)){
+    let i = h.findIndex(x=>alts.includes(x));
+    if(i<0 && !['nom','taille','n','no','id','code'].includes(k)) i = h.findIndex(x=>alts.some(a=>a.length>3 && x.includes(a)));
+    if(i>=0 && !Object.values(map).includes(i)) map[k]=i;
+  }
+  if(map.nomComplet!==undefined && map.nom===undefined) {/* ok */}
+  return map;
+}
+
+const EPI_KEYWORDS = [
+  [['anti bruit','antibruit','bouchon','auditif','oreille','casque anti','serre tete'], 'Protection anti-bruit'],
+  [['chaussure','soulier','botte','brodequin','securite pied','basket'], 'Chaussures de sécurité'],
+  [['lunette','visiere','ecran facial','oculaire'], 'Lunettes de protection'],
+  [['gilet','haute visibilite','hv','fluo','chasuble'], 'Gilet haute visibilité'],
+  [['gant'], 'Gants de protection'],
+  [['masque','respiratoire','ffp','cartouche','demi masque'], 'Masque respiratoire'],
+  [['harnais','antichute','longe'], 'Harnais antichute'],
+  [['casque','chantier'], 'Casque de sécurité'],
+  [['combinaison','tenue','blouse','pantalon','veste','bleu de travail','parka','tablier','cotte'], 'Tenue de travail'],
+];
+function matchCategory(text){
+  const t = norm(text);
+  if(!t) return null;
+  const exact = db.categories.find(c=>norm(c.nom)===t); if(exact) return exact;
+  for(const [kws,nom] of EPI_KEYWORDS){ if(kws.some(k=>t.includes(k))){ const c = db.categories.find(c=>c.nom===nom); if(c) return c; } }
+  return db.categories.find(c=>t.includes(norm(c.nom).split(' ')[0])) || null;
+}
+
+function parseDate(v){
+  if(!v) return '';
+  const s = String(v).trim();
+  let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/); if(m) return `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
+  m = s.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})/); if(m){ const y = m[3].length===2? '20'+m[3] : m[3]; return `${y}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`; }
+  if(/^\d{5}$/.test(s)){ const d=new Date(Math.round((Number(s)-25569)*86400000)); return d.toISOString().slice(0,10); }
+  return '';
+}
+
+async function importFile(file){
+  let rows;
+  try { rows = await readRows(file); } catch(e){ return toast('Erreur de lecture : '+e.message); }
+  rows = rows.filter(r=>r.some(c=>String(c).trim()!==''));
+  if(rows.length<2) return toast('Le fichier est vide ou ne contient pas de données');
+  // ligne d'en-tête = première ligne contenant "matricule" ou "nom", sinon la première
+  let hi = rows.findIndex(r=>r.some(c=>['matricule','nom','nom et prenom','nom prenom'].includes(norm(c))));
+  if(hi<0) hi=0;
+  const header = rows[hi], data = rows.slice(hi+1);
+  const auto = detectCols(header);
+  showMapping(header, data, auto, file.name);
+}
+
+function showMapping(header, data, auto, fname){
+  const fields = [['matricule','Matricule *'],['nom','Nom *'],['prenom','Prénom'],['nomComplet','Nom et prénom (une seule colonne)'],['fonction','Fonction'],['service','Service / Chantier'],
+    ['tailleVetement','Taille vêtement'],['pointure','Pointure'],['tailleGants','Taille gants'],['epi','EPI'],['taille','Taille (de l\'EPI de la ligne)'],['quantite','Quantité'],['date','Date de remise'],['telephone','Téléphone']];
+  const opt = sel => `<option value="">— ignorer —</option>` + header.map((h,i)=>`<option value="${i}" ${sel===i?'selected':''}>${esc(h||'Colonne '+(i+1))}</option>`).join('');
+  const preview = data.slice(0,5);
+  openDlg(`Importer « ${esc(fname)} » — ${data.length} lignes`, `
+    <p class="hint">Vérifiez la correspondance des colonnes (détectée automatiquement), puis lancez l'import. Les personnes déjà présentes (même matricule) seront mises à jour.</p>
+    <div class="form">${fields.map(([k,l])=>`<label>${l}<select data-k="${k}" class="mapsel">${opt(auto[k])}</select></label>`).join('')}
+      <label class="full" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" id="imp_dot" style="width:auto" checked> Créer les dotations à partir de la colonne EPI (si renseignée)</label>
+      <label class="full" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" id="imp_stock" style="width:auto"> Déduire ces dotations du stock</label>
+    </div>
+    <h3 style="margin-top:16px">Aperçu</h3>
+    <div class="table-wrap"><table><thead><tr>${header.map(h=>`<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${preview.map(r=>`<tr>${header.map((_,i)=>`<td>${esc(r[i])}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`,
+  [
+    {label:'Annuler', fn:closeDlg},
+    {label:'Importer', cls:'primary', fn:()=>{
+      const map={}; document.querySelectorAll('.mapsel').forEach(s=>{ if(s.value!=='') map[s.dataset.k]=Number(s.value); });
+      if(map.matricule===undefined) return toast('Choisissez la colonne Matricule');
+      if(map.nom===undefined && map.nomComplet===undefined) return toast('Choisissez la colonne Nom (ou Nom et prénom)');
+      doImport(data, map, $('#imp_dot').checked, $('#imp_stock').checked);
+    }}
+  ]);
+}
+
+function doImport(data, map, withDot, withStock){
+  const g = (r,k) => map[k]===undefined? '' : String(r[map[k]]??'').trim();
+  let added=0, updated=0, dots=0, skipped=0; const unknownEpi = new Set();
+  const byMat = new Map(db.personnel.map(p=>[String(p.matricule).trim().toLowerCase(), p]));
+  data.forEach(r=>{
+    const mat = g(r,'matricule');
+    let nom = g(r,'nom'), prenom = g(r,'prenom');
+    if(!nom && map.nomComplet!==undefined){ const parts = g(r,'nomComplet').split(/\s+/); nom = parts.shift()||''; prenom = prenom || parts.join(' '); }
+    if(!mat || !nom){ skipped++; return; }
+    let p = byMat.get(mat.toLowerCase());
+    if(!p){ p = {id:uid(), matricule:mat, actif:true}; db.personnel.push(p); byMat.set(mat.toLowerCase(), p); added++; }
+    else if(!p._touched) updated++;
+    p._touched = true;
+    const set = (k,v) => { if(v) p[k]=v; };
+    set('nom', nom); set('prenom', prenom); set('fonction', g(r,'fonction')); set('service', g(r,'service')); set('telephone', g(r,'telephone'));
+    set('tailleVetement', g(r,'tailleVetement').toUpperCase()); set('pointure', g(r,'pointure')); set('tailleGants', g(r,'tailleGants'));
+
+    const epiTxt = g(r,'epi'), taille = g(r,'taille');
+    // un champ EPI peut contenir plusieurs EPI séparés par , / + ;
+    const epis = epiTxt ? epiTxt.split(/[,;\/+]| et /i).map(s=>s.trim()).filter(Boolean) : [];
+    epis.forEach(e=>{
+      const c = matchCategory(e);
+      if(!c){ unknownEpi.add(e); return; }
+      // renseigner la taille de la personne selon le type
+      if(taille){
+        if(c.typeTaille==='pointure' && !g(r,'pointure')) p.pointure = taille;
+        if(c.typeTaille==='vetement' && !g(r,'tailleVetement')) p.tailleVetement = taille.toUpperCase();
+        if(c.typeTaille==='gants' && !g(r,'tailleGants')) p.tailleGants = taille;
+      }
+      if(!withDot) return;
+      const arts = db.articles.filter(a=>a.categorieId===c.id);
+      const a = arts.find(a=>norm(e).includes(norm(a.designation).split(' ')[0])) || arts[0];
+      if(!a) return;
+      const t = c.typeTaille==='unique' ? (Object.keys(a.stock)[0]||'Unique') : (taille || personSize(p,c.typeTaille) || Object.keys(a.stock)[0]);
+      const tKey = Object.keys(a.stock).find(k=>k.toUpperCase()===String(t).toUpperCase());
+      const key = tKey || String(t);
+      if(!(key in a.stock)) a.stock[key] = 0;
+      const q = Math.max(1, Number(g(r,'quantite'))||1);
+      if(withStock) a.stock[key] = Number(a.stock[key]) - q;
+      db.dotations.push({id:uid(), personneId:p.id, categorieId:c.id, articleId:a.id, taille:key, quantite:q, date:parseDate(g(r,'date'))||today(), motif:'Première dotation', observation:'Import', createdAt:new Date().toISOString()});
+      dots++;
+    });
+    if(!epis.length && taille && map.epi===undefined && !g(r,'tailleVetement')) p.tailleVetement = taille.toUpperCase();
+  });
+  db.personnel.forEach(p=>delete p._touched);
+  save(); closeDlg(); go('personnel');
+  let msg = `Import terminé : ${added} ajoutée(s), ${updated} mise(s) à jour${dots? `, ${dots} dotation(s)`:''}${skipped? `, ${skipped} ligne(s) ignorée(s)`:''}.`;
+  if(unknownEpi.size) msg += `\nEPI non reconnus : ${[...unknownEpi].slice(0,8).join(', ')}`;
+  alert(msg);
+}
+
+function downloadTemplate(){
+  const rows = [['Matricule','Nom','Prénom','Fonction','Service','EPI','Taille','Date'],
+    ['1001','ALAOUI','Mohamed','Soudeur','Atelier','Chaussures de sécurité','42','2026-01-15'],
+    ['1001','ALAOUI','Mohamed','Soudeur','Atelier','Gilet haute visibilité','L','2026-01-15'],
+    ['1002','BENNANI','Fatima','Technicienne','Maintenance','Lunettes de protection','Unique','2026-02-01']];
+  writeBook({'Personnel':rows}, 'modele_import_personnel_EPI');
+}
+
+function writeBook(sheets, name){
+  if(typeof XLSX==='undefined'){
+    const [first] = Object.entries(sheets);
+    const csv = '﻿' + first[1].map(r=>r.map(c=>`"${String(c??'').replace(/"/g,'""')}"`).join(';')).join('\r\n');
+    return dl(new Blob([csv],{type:'text/csv'}), name+'.csv');
+  }
+  const wb = XLSX.utils.book_new();
+  for(const [n,rows] of Object.entries(sheets)){ const ws = XLSX.utils.aoa_to_sheet(rows); ws['!cols']=rows[0].map((_,i)=>({wch:Math.min(40,Math.max(10,...rows.map(r=>String(r[i]??'').length+2)))})); XLSX.utils.book_append_sheet(wb, ws, n.slice(0,31)); }
+  XLSX.writeFile(wb, name+'.xlsx');
+}
+function dl(blob, name){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000); }
+
+function dotationRows(list){
+  return [['Date','Matricule','Nom','Prénom','Fonction','Service','Catégorie','Article','Taille','Quantité','Motif','Observation'],
+    ...list.sort((a,b)=>a.date.localeCompare(b.date)).map(d=>{ const p=person(d.personneId)||{}; return [fmtDate(d.date),p.matricule,p.nom,p.prenom,p.fonction,p.service,cat(d.categorieId)?.nom,article(d.articleId)?.designation,d.taille,d.quantite,d.motif,d.observation]; })];
+}
+function exportDotations(){ writeBook({'Dotations':dotationRows([...db.dotations])}, 'dotations_EPI_'+today()); }
+
+function exportAll(){
+  const pers = [['Matricule','Nom','Prénom','Fonction','Service','Taille vêtement','Pointure','Taille gants','Téléphone','Statut'],
+    ...db.personnel.map(p=>[p.matricule,p.nom,p.prenom,p.fonction,p.service,p.tailleVetement,p.pointure,p.tailleGants,p.telephone,p.actif===false?'Inactif':'Actif'])];
+  const stock = [['Catégorie','Article','Référence','Taille','Quantité','Seuil']];
+  db.articles.forEach(a=>Object.entries(a.stock).forEach(([t,v])=>stock.push([cat(a.categorieId)?.nom,a.designation,a.reference,t,v,a.seuil])));
+  const sit = [['Matricule','Nom','Prénom','Fonction',...db.categories.map(c=>c.nom)],
+    ...db.personnel.filter(p=>p.actif!==false).map(p=>[p.matricule,p.nom,p.prenom,p.fonction,...db.categories.map(c=>{ const s=epiStatus(p.id,c.id); return s.last? `${s.label} (dern. ${fmtDate(s.last.date)})` : s.label; })])];
+  writeBook({'Personnel':pers,'Dotations':dotationRows([...db.dotations]),'Stock':stock,'Situation EPI':sit}, 'gestion_EPI_'+today());
+}
+
+function backup(){ dl(new Blob([JSON.stringify(db,null,1)],{type:'application/json'}), 'sauvegarde_EPI_'+today()+'.json'); }
+function restore(file){
+  const r = new FileReader();
+  r.onload = ()=>{ try{ const d = JSON.parse(r.result); if(!d.personnel||!d.categories) throw 0; if(!confirm('Remplacer toutes les données actuelles par cette sauvegarde ?')) return; db=d; db.mouvements=db.mouvements||[]; save(); render(); toast('Sauvegarde restaurée ✔'); } catch(e){ toast('Fichier de sauvegarde invalide'); } };
+  r.readAsText(file);
+}
+function resetAll(){ if(!confirm('Effacer TOUTES les données (personnel, dotations, stock) ?')) return; if(!confirm('Êtes-vous sûr ? Cette action est irréversible.')) return; db=seed(); save(); render(); toast('Données réinitialisées'); }
+
+/* ============================================================
+   Boîte de dialogue
+   ============================================================ */
+function openDlg(title, body, buttons){
+  $('#dlgTitle').innerHTML = title;
+  $('#dlgBody').innerHTML = body;
+  const f = $('#dlgFoot'); f.innerHTML='';
+  buttons.filter(Boolean).forEach((b,i)=>{ const el=document.createElement('button'); el.className='btn '+(b.cls||''); el.textContent=b.label; el.onclick=b.fn; if(b.cls==='danger'){ el.style.marginRight='auto'; } f.appendChild(el); });
+  const d = $('#dlg'); if(!d.open) d.showModal();
+}
+function closeDlg(){ $('#dlg').close(); }
+
+load(); render();
+</script>
+</body>
+</html>
